@@ -426,7 +426,6 @@ function Multiplication(f::Fun{<:JacobiWeight{<:ConstantSpace,<:IntervalOrSegmen
     # see DLMF (18.9.6)
     d=domain(f)
     Sf = space(f)
-    Cs = Sf.space
     if ((Sf.β==1 && Sf.α==0 && S.b >0) ||
                         (Sf.β==0 && Sf.α==1 && S.a >0))
         ConcreteMultiplication(f,S)
