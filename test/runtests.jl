@@ -109,9 +109,21 @@ end
         xg = Fun(x->x*√(1-x^2), JacobiWeight(0.5, 0.5, Jacobi(1,1)))
         @test Multiplication(g) * Fun(NormalizedLegendre()) ≈ xg
 
-        f = Fun(x -> (1-x)^2, JacobiWeight(3,4,ConstantSpace(ChebyshevInterval())));
-        S = @inferred (f -> domainspace(Multiplication(f, Jacobi(1,1))))(f)
-        @test S == Jacobi(1,1)
+        genf(β,α) = Fun(x -> (1+x)^β * (1-x)^α, JacobiWeight(β,α,ConstantSpace(ChebyshevInterval())));
+
+        f = genf(0,2)
+        J = Jacobi(5,5)
+        S = @inferred ((f,J) -> domainspace(Multiplication(f, J)))(f,J)
+        @test S == J
+
+        for β in 0:5, α in 0:5
+            f = genf(β, α)
+            g = Fun(x->(1+x)^2 * (1+x)^β * (1-x)^α)
+            for b in 0:8, a in 0:8
+                S = Jacobi(b,a)
+                @test Multiplication(f) * Fun(x->(1+x)^2, S) ≈ g
+            end
+        end
     end
 
     @testset "Derivative" begin
