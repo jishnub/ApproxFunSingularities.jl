@@ -441,8 +441,8 @@ function Multiplication(f::Fun{<:JacobiWeight{<:ConstantSpace,<:IntervalOrSegmen
         fJ = Fun(space(fJ_), coefficients(fJ_) * coefficient(f,1))
         Ms = ConcreteMultiplication(fJ, S)
         rs = rangespace(Ms)
-        rsb, rsa = rs.b, rs.a
-        Sfrs = JacobiWeight(Sf.β - (S.b - rs.b), Sf.α - (S.a - rs.a), Sf.space)
+        rsb, rsa = rs.space.b, rs.space.a
+        Sfrs = JacobiWeight(Sf.β - (S.b - rsb), Sf.α - (S.a - rsa), Sf.space)
         stoppingSf = Sf.β <= S.b && Sf.α <= S.a # stop at (Sf.β, Sf.α) = (0,1) or (1,0)
         if stoppingSf
             βstop = 1+iszero(Sf.α)
@@ -450,17 +450,17 @@ function Multiplication(f::Fun{<:JacobiWeight{<:ConstantSpace,<:IntervalOrSegmen
             vb1 = [ConcreteMultiplication(jw10(d), Jacobi(rsb-(i-βstop),rsa,d)) for i in Sf.β - (S.b - rsb):-1:βstop]
             rsvb1 = isempty(vb1) ? rs : rangespace(first(vb1))
             # if vb is non-empty, the domainspace of the last term should be rsvb1
-            va1 = [ConcreteMultiplication(jw01(d), Jacobi(rsvb1.b,rsa-(i-2),d)) for i in (Sf.α - (Sf.β == 0)):-1:2]
+            va1 = [ConcreteMultiplication(jw01(d), Jacobi(rsvb1.space.b,rsa-(i-2),d)) for i in (Sf.α - (Sf.β == 0)):-1:2]
             rsva = isempty(va1) ? rsvb1 : rangespace(first(va1))
-            βgtα = Sf.β - (S.b - rsva.b) > Sf.α - (S.a - rsva.a)
-            ML = ConcreteMultiplication(jacobiweight(Int(βgtα),Int(!βgtα),d), rsva)
+            βgtα = Sf.β - (S.b - rsva.space.b) > Sf.α - (S.a - rsva.space.a)
+            ML = ConcreteMultiplication(jacobiweight(Int(βgtα),Int(!βgtα),d), rsva.space)
             v = [va1; vb1; [Ms]]
         else
             vb2 = [ConcreteMultiplication(jw10(d), Jacobi(b,rsa,d)) for b in 1:(rsb * (Sf.β > 0))]
             rsvb2 = isempty(vb2) ? rs : rangespace(first(vb2))
-            va2 = [ConcreteMultiplication(jw01(d), Jacobi(rsvb2.b,a,d)) for a in 1:(rsa * (Sf.α > 0))]
+            va2 = [ConcreteMultiplication(jw01(d), Jacobi(rsvb2.space.b,a,d)) for a in 1:(rsa * (Sf.α > 0))]
             rsva2 = isempty(va2) ? rsvb2 : rangespace(first(va2))
-            ML = _default_mul(jacobiweight(Sf.β-(S.b-rsva2.b), Sf.α-(S.a-rsva2.a), d), rsva2)
+            ML = _default_mul(jacobiweight(Sf.β-(S.b-rsva2.space.b), Sf.α-(S.a-rsva2.space.a), d), rsva2.space)
             v = [va2; vb2; [Ms]]
         end
         bw = bandwidthssum(bandwidths, v) .+ bandwidths(ML)
@@ -468,7 +468,7 @@ function Multiplication(f::Fun{<:JacobiWeight{<:ConstantSpace,<:IntervalOrSegmen
         sbbw = bandwidthssum(subblockbandwidths, v) .+ subblockbandwidths(ML)
         ts = (size(ML, 1), size(Ms, 2))
         T = TimesOperator(Operator{eltype(ML)}[ML; v], bw, ts, bbw, sbbw)
-        MultiplicationWrapper(f, T, S)
+        MultiplicationWrapper(f, SpaceOperator(T, S, rangespace(ML)), S)
     elseif isapproxinteger(Sf.β) && Sf.β ≥ 1 && S.b >0
         # decrement β and multiply again
         fJ = jacobiweight(1,0,d)
@@ -497,15 +497,18 @@ Multiplication(f::Fun{<:JacobiWeight{<:ConstantSpace,<:IntervalOrSegmentDomain}}
 function rangespace(M::ConcreteMultiplication{<:
                         JacobiWeight{<:ConstantSpace,<:IntervalOrSegmentDomain},<:Jacobi})
     S=domainspace(M)
-    if space(M.f).β==1
+    Sf = space(M.f)
+    zeroT = zero(Sf.β)
+    J = if Sf.β == 1
         # multiply by (1+x)
         Jacobi(S.b-1,S.a,domain(S))
-    elseif space(M.f).α == 1
+    elseif Sf.α == 1
         # multiply by (1-x)
         Jacobi(S.b,S.a-1,domain(S))
     else
         error("Not implemented")
     end
+    JacobiWeight(zeroT, zeroT, J)
 end
 
 bandwidths(::ConcreteMultiplication{<:
@@ -517,9 +520,10 @@ function getindex(M::ConcreteMultiplication{
                 k::Integer, j::Integer)
     @assert ncoefficients(M.f)==1
     a,b=domainspace(M).a,domainspace(M).b
-    c=M.f.coefficients[1]
-    if space(M.f).β==1
-        @assert space(M.f).α==0
+    c = coefficient(M.f, 1)
+    Sf = space(M.f)
+    if Sf.β==1
+        @assert Sf.α==0
         # multiply by (1+x)
         if j==k
             c*2(k+b-1)/(2k+a+b-1)
@@ -528,8 +532,8 @@ function getindex(M::ConcreteMultiplication{
         else
             zero(eltype(M))
         end
-    elseif space(M.f).α == 1
-        @assert space(M.f).β==0
+    elseif Sf.α == 1
+        @assert Sf.β==0
         # multiply by (1-x)
         if j==k
             c*2(k+a-1)/(2k+a+b-1)

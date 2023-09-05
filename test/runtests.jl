@@ -113,15 +113,29 @@ end
 
         f = genf(0,2)
         J = Jacobi(5,5)
-        S = @inferred ((f,J) -> domainspace(Multiplication(f, J)))(f,J)
+        dsp(f, J) = domainspace(Multiplication(f, J))
+        S = if VERSION >= v"1.9"
+            @inferred dsp(f, J)
+        else
+            dsp(f, J)
+        end
         @test S == J
+        rsp(f, J) = rangespace(Multiplication(f, J))
+        S = if VERSION >= v"1.9"
+            @inferred rsp(f, J)
+        else
+            rsp(f, J)
+        end
+        @test S == Jacobi(5,3)
 
         for β in 0:5, α in 0:5
             f = genf(β, α)
             g = Fun(x->(1+x)^2 * (1+x)^β * (1-x)^α)
             for b in 0:8, a in 0:8
                 S = Jacobi(b,a)
-                @test Multiplication(f) * Fun(x->(1+x)^2, S) ≈ g
+                w = Fun(x->(1+x)^2, S)
+                @test Multiplication(f) * w ≈ g
+                @test @inferred(Multiplication(f, S) * w) ≈ g
             end
         end
     end
