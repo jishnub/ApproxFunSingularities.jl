@@ -447,10 +447,12 @@ function Multiplication(f::Fun{<:JacobiWeight{<:ConstantSpace,<:IntervalOrSegmen
         if stoppingSf
             βstop = 1+iszero(Sf.α)
             # if vb is non-empty, the domainspace of the last term should be rs
-            vb1 = [ConcreteMultiplication(jw10(d), Jacobi(rsb-(i-βstop),rsa,d)) for i in Sf.β - (S.b - rsb):-1:βstop]
+            nb = length(βstop:rsb)
+            vb1 = [ConcreteMultiplication(jw10(d), Jacobi(b,rsa,d)) for b in rsb-nb+1:rsb]
             rsvb1 = isempty(vb1) ? rs : rangespace(first(vb1))
             # if vb is non-empty, the domainspace of the last term should be rsvb1
-            va1 = [ConcreteMultiplication(jw01(d), Jacobi(rsvb1.space.b,rsa-(i-2),d)) for i in (Sf.α - (Sf.β == 0)):-1:2]
+            na = length(2:(Sf.α - (Sf.β == 0)))
+            va1 = [ConcreteMultiplication(jw01(d), Jacobi(rsvb1.space.b,a,d)) for i in rsa-na+1:rsa]
             rsva = isempty(va1) ? rsvb1 : rangespace(first(va1))
             βgtα = Sf.β - (S.b - rsva.space.b) > Sf.α - (S.a - rsva.space.a)
             ML = ConcreteMultiplication(jacobiweight(Int(βgtα),Int(!βgtα),d), rsva.space)
